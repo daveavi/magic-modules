@@ -1,0 +1,81 @@
+resource "google_project" "my_project" {
+  name       = "{{project_name}}"
+  project_id = "{{project_id}}"
+  org_id     = "{{org_id}}"
+}
+
+resource "google_folder" "folder1" {
+  display_name = "{{folder_name}}"
+  parent       = "organizations/${google_project.my_project.org_id}"
+}
+
+resource "google_project_service" "kms-service" {
+  project = google_project.my_project.project_id
+  service = "cloudkms.googleapis.com"
+}
+
+resource "google_project_service" "eventarc-service" {
+  project = google_project.my_project.project_id
+  service = "eventarc.googleapis.com"
+}
+
+resource "google_project_service" "eventarcpublishing-service" {
+  project = google_project.my_project.project_id
+  service = "eventarcpublishing.googleapis.com"
+}
+
+resource "google_project_service" "pubsub-service" {
+  project = google_project.my_project.project_id
+  service = "pubsub.googleapis.com"
+}
+
+resource "google_kms_key_ring" "keyring" {
+  name     = "{{ring}}"
+  location = "{{region}}"
+}
+
+resource "google_kms_crypto_key" "key1" {
+  name            = {{key_1}}
+  key_ring        = google_kms_key_ring.keyring.id
+  rotation_period = "100000s"
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_kms_crypto_key" "key2" {
+  name            = "{{key_2}}"
+  key_ring        = google_kms_key_ring.keyring.id
+  rotation_period = "100000s"
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+data "google_iam_policy" "admin" {
+  binding {
+    role = "roles/cloudkms.cryptoKeyEncrypter"
+
+    members = [
+      "serviceAccount:service-${google_project.my_project.number}@gcp-sa-eventarc.iam.gserviceaccount.com",
+    ]
+  }
+}
+
+resource "google_kms_crypto_key_iam_policy" "crypto_key1" {
+  crypto_key_id = google_kms_crypto_key.key1.id
+  policy_data = data.google_iam_policy.admin.policy_data
+}
+
+resource "google_kms_crypto_key_iam_policy" "crypto_key2" {
+  crypto_key_id = google_kms_crypto_key.key2.id
+  policy_data = data.google_iam_policy.admin.policy_data
+}
+
+resource "google_eventarc_channel" "primary" {
+  location = "{{region}}"
+  name     = "{{name}}"
+  project  = "${google_project.my_project.name}"
+  crypto_key_name: "projects/${google_project.my_project.name}/locations/{{region}}/keyRings/${google_kms_key_ring.keyring.name}/cryptoKeys/${google_kms_crypto_key.key1.name}",
+  third_party_provider = "projects/${google_project.my_project.name}/locations/{{region}}/providers/datadog"
+}

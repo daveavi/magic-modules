@@ -1,0 +1,17 @@
+updates:
+- resource: ./basic_update.tf.tmpl
+variables:
+  - name: "project_name"
+    type: "resource_name"
+  - name: "project_id"
+    type: "project_id"
+  - name: "org_id"
+    type: "org_id"
+  - name: "folder_name"
+    type: "display_name"
+  - name: "ring"
+    type: "resource_name"
+  - name: "key_1"
+    type: "resource_name"
+  - name: "key_2"
+    type: "resource_name"

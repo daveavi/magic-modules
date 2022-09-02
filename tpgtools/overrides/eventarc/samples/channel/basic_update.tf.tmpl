@@ -1,0 +1,7 @@
+resource "google_eventarc_channel" "primary" {
+  location = "{{region}}"
+  name     = "{{name}}"
+  project  = "${google_project.my_project.name}"
+  crypto_key_name: "projects/{{project_name}}/locations/{{region}}/keyRings/{{ring}}/cryptoKeys/{{key_2}}",
+  third_party_provider = "projects/{{project_name}}/locations/{{region}}/providers/datadog"
+}
