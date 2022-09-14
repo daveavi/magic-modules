@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
-func TestAccEventarcTrigger_ChannelHandWritten(t *testing.T) {
+func TestAccEventarcTrigger_channel(t *testing.T) {
 	t.Parallel()
 
 	region := getTestRegionFromEnv()
@@ -39,10 +39,18 @@ func TestAccEventarcTrigger_ChannelHandWritten(t *testing.T) {
 		CheckDestroy: testAccCheckEventarcChannelDestroyProducer(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccEventarcChannel_BasicHandWritten(context),
+				Config: testAccEventarcTrigger_createChannel(context),
 			},
 			{
 				ResourceName:      "google_eventarc_channel.primary",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccEventarcTrigger_createTriggerWithChannelName(context),
+			},
+			{
+				ResourceName:      "google_eventarc_trigger.primary",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
@@ -51,7 +59,7 @@ func TestAccEventarcTrigger_ChannelHandWritten(t *testing.T) {
 	})
 }
 
-func testAccEventarcTrigger_ChannelHandWritten(context map[string]interface{}) string {
+func testAccEventarcTrigger_createTriggerWithChannelName(context map[string]interface{}) string {
 	return Nprintf(`
 data "google_project" "test_project" {
 	project_id  = "%{project_name}"
@@ -79,13 +87,23 @@ resource "google_kms_crypto_key_iam_binding" "key1_binding" {
 
 resource "google_eventarc_channel" "primary" {
     location = "%{region}"
-    name     = "tf-test-name%{random_suffix}"
-    project  = "${data.google_project.test_project.project_id}"
-    crypto_key_name =  "${data.google_kms_crypto_key.key1.id}"
+    name     = "tf-test-channel%{random_suffix}"
+    project  = data.google_project.test_project.project_id
+    crypto_key_name =  data.google_kms_crypto_key.key1.id
     third_party_provider = "projects/${data.google_project.test_project.project_id}/locations/%{region}/providers/datadog"
     depends_on = [google_kms_crypto_key_iam_binding.key1_binding]
 }
 
+
+`, context)
+}
+
+func testAccEventarcTrigger_createTriggerWithChannelName(context map[string]interface{}) string {
+	return Nprintf(`
+
+data "google_project" "test_project" {
+	project_id  = "%{project_name}"
+}
 resource "google_pubsub_topic" "foo" {
 	name = "tf-test-topic%{random_suffix}"
 }
@@ -118,7 +136,7 @@ resource "google_cloud_run_service" "default" {
 }
 
 resource "google_eventarc_trigger" "primary" {
-	name = "tf-test-name%{random_suffix}"
+	name = "tf-test-trigger%{random_suffix}"
 	location = "europe-west1"
 	matching_criteria {
 		attribute = "type"
@@ -136,7 +154,7 @@ resource "google_eventarc_trigger" "primary" {
 		}
 	}
 
-    channel = "${google_eventarc_channel.primary.name}"
+    channel = "projects/${data.google_project.test_project.project_id}/locations/%{region}/channels/tf-test-channel%{random_suffix}"
 
     depends_on =[google_pubsub_topic.foo,google_cloud_run_service.default, google_eventarc_channel.primary]
 }
@@ -144,7 +162,6 @@ resource "google_eventarc_trigger" "primary" {
 
 `, context)
 }
-
 
 func testAccCheckEventarcChannelDestroyProducer(t *testing.T) func(s *terraform.State) error {
     return func(s *terraform.State) error {
